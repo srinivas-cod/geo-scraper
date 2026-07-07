@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Maps Extractor</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; padding: 40px; display: flex; justify-content: center; }
+        .container { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; max-width: 500px; text-align: center; }
+        h1 { color: #333; margin-top: 0; }
+        input { width: 100%; padding: 12px; margin: 15px 0; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 16px; }
+        button { background-color: #4CAF50; color: white; padding: 12px 20px; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; width: 100%; font-weight: bold; }
+        button:hover { background-color: #45a049; }
+        button:disabled { background-color: #cccccc; cursor: not-allowed; }
+        #status-area { margin-top: 20px; text-align: left; }
+        .status-msg { padding: 15px; border-radius: 6px; margin-bottom: 10px; display: none; font-size: 15px; }
+        .info { background-color: #e7f3fe; color: #31708f; border: 1px solid #bce8f1; display: block; }
+        .success { background-color: #dff0d8; color: #3c763d; border: 1px solid #d6e9c6; display: block; }
+        .error { background-color: #f2dede; color: #a94442; border: 1px solid #ebccd1; display: block; }
+        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 16px; height: 16px; animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; margin-right: 10px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Google Maps Extractor</h1>
+        <p>Enter a search keyword to automatically scrape and download the CSV results.</p>
+        
+        <input type="text" id="keyword" placeholder="e.g. Dentists in Chennai" required onkeypress="handleKeyPress(event)">
+        <button id="start-btn" onclick="startExtraction()">Start Extraction</button>
+
+        <div id="status-area">
+            <div id="status-box" class="status-msg"></div>
+        </div>
+    </div>
+
+    <script>
+        let pollInterval;
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                startExtraction();
+            }
+        }
+
+        async function startExtraction() {
+            const keyword = document.getElementById('keyword').value.trim();
+            if (!keyword) {
+                showStatus('error', 'Please enter a keyword.');
+                return;
+            }
+
+            const btn = document.getElementById('start-btn');
+            btn.disabled = true;
+            showStatus('info', '<div class="spinner"></div> Starting browser and search...');
+
+            try {
+                const response = await fetch('/extract', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ keyword: keyword })
+                });
+
+                if (!response.ok) throw new Error('Failed to start extraction');
+
+                const data = await response.json();
+                const jobId = data.job_id;
+
+                showStatus('info', '<div class="spinner"></div> Scraping in progress (this may take a few minutes)...');
+                
+                // Poll for status every 5 seconds
+                pollInterval = setInterval(() => checkStatus(jobId), 5000);
+
+            } catch (error) {
+                showStatus('error', 'Error: ' + error.message);
+                btn.disabled = false;
+            }
+        }
+
+        async function checkStatus(jobId) {
+            try {
+                const response = await fetch(`/results/${jobId}`);
+                const data = await response.json();
+
+                if (data.status === 'done') {
+                    clearInterval(pollInterval);
+                    showStatus('success', `✅ Done! Extracted ${data.records_count} records. Downloading CSV...`);
+                    document.getElementById('start-btn').disabled = false;
+                    
+                    // Trigger download automatically
+                    window.location.href = `/download/${jobId}/csv`;
+                } else if (data.status === 'failed') {
+                    clearInterval(pollInterval);
+                    showStatus('error', '❌ Extraction failed: ' + (data.error || 'Unknown error'));
+                    document.getElementById('start-btn').disabled = false;
+                }
+            } catch (error) {
+                console.error("Polling error:", error);
+            }
+        }
+
+        function showStatus(type, htmlContent) {
+            const box = document.getElementById('status-box');
+            box.className = 'status-msg ' + type;
+            box.innerHTML = htmlContent;
+        }
+    </script>
+</body>
+</html>
