@@ -63,6 +63,6 @@ playwright install
  API Endpoints (For Developers)
 If you prefer to interact with the API directly (or via Swagger), visit `http://localhost:8080/docs`.
 
-- `POST /extract`**: Start a background scraping job by providing a `{"keyword": "..."}` JSON payload. Returns a `job_id`.
-- `GET /results/{job_id}`**: Poll the status of the scraping job.
-- `GET /download/{job_id}/{file_type}`**: Download the finished data. `file_type` can be `csv`, `excel`, or `json`.
+- `POST /extract`: Start a background scraping job by providing a `{"keyword": "..."}` JSON payload. Returns a `job_id`.
+- `GET /results/{job_id}`: Poll the status of the scraping job.
+- `GET /download/{job_id}/{file_type}`: Download the finished data. `file_type` can be `csv`, `excel`, or `json`.
